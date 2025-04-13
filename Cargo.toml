@@ -1,20 +1,18 @@
 [package]
-name = "registry_playground"
+name = "windows_registry_searcher"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 winreg = "0.52.0"
-parking_lot = "0.12.1"
-tokio = { version = "1.35.1", default-features = false, features = ["sync", "macros", "rt-multi-thread", "time", "tracing"] }
+parking_lot = "0.12.3"
+tokio = { version = "1.39.2", default-features = false, features = ["sync", "macros", "rt-multi-thread", "time", "tracing"] }
 num_cpus = "1.16.0"
-clap = "4.4.11"
-ratatui = "0.25.0"
-crossterm = "0.27.0"
+clap = "4.5.13"
+ratatui = "0.27.0"
+crossterm = "0.28.1"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.18" }
 tracing = "0.1.40"
 directories = "5.0.1"
-strum = { version = "0.25", features = ["derive"] }
+strum = { version = "0.26.3", features = ["derive"] }

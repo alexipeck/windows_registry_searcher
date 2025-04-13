@@ -1,9 +1,5 @@
 use directories::BaseDirs;
 use parking_lot::RwLock;
-use registry_playground::{
-    controls::controls, renderer::renderer_wrappers_wrapper, static_selection::StaticSelection,
-    worker_runtime::worker_runtime, Focus,
-};
 use std::{
     error::Error,
     sync::{atomic::AtomicBool, Arc},
@@ -12,6 +8,10 @@ use std::{
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, Level};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, registry::Registry, Layer};
+use windows_registry_searcher::{
+    controls::controls, renderer::renderer_wrappers_wrapper, static_selection::StaticSelection,
+    worker_runtime::worker_runtime, Focus,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

@@ -37,6 +37,8 @@ pub struct StaticSelection {
     pub stop_notify: Arc<Notify>,
 
     pub results: Arc<Mutex<BTreeSet<String>>>,
+    result_selected: Arc<AtomicU8>,
+    result_selection_last_changed: Arc<Mutex<Instant>>,
 }
 
 impl Default for StaticSelection {
@@ -54,6 +56,8 @@ impl Default for StaticSelection {
             stop: Arc::new(AtomicBool::new(false)),
             stop_notify: Arc::new(Notify::new()),
             results: Arc::new(Mutex::new(BTreeSet::new())),
+            result_selected: Arc::new(AtomicU8::new(0)),
+            result_selection_last_changed: Arc::new(Mutex::new(Instant::now())),
         }
     }
 }
@@ -88,13 +92,23 @@ impl StaticSelection {
     }
 
     pub fn generate_results(&self) -> Vec<Line<'static>> {
-        self.results
-            .lock()
+        let pane_selected = self.pane_selected.load(Ordering::SeqCst) == 2;
+        let result_selected = self.result_selected.load(Ordering::SeqCst) as usize;
+
+        let results_lock = self.results.lock();
+        let results_vec: Vec<&String> = results_lock.iter().collect();
+
+        results_vec
             .iter()
-            .map(|result| {
+            .enumerate()
+            .map(|(index, result)| {
                 Line::from(vec![Span::styled(
                     result.to_string(),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(if pane_selected && index == result_selected {
+                        SELECTION_COLOUR
+                    } else {
+                        Color::White
+                    }),
                 )])
             })
             .collect::<Vec<Line>>()
@@ -156,5 +170,50 @@ impl StaticSelection {
         if let Some(root) = Root::from_u8(selected) {
             self.selected_roots.write().toggle(&root);
         }
+    }
+
+    pub fn result_up(&self) {
+        if self.result_selection_last_changed.lock().elapsed() < DEBOUNCE {
+            return;
+        }
+
+        let results_count = self.results.lock().len() as u8;
+        if results_count == 0 {
+            return;
+        }
+
+        let current_value = self.result_selected.load(Ordering::SeqCst);
+        let new_value = if current_value == 0 {
+            results_count - 1
+        } else {
+            current_value - 1
+        };
+
+        self.result_selected.store(new_value, Ordering::SeqCst);
+        *self.result_selection_last_changed.lock() = Instant::now();
+    }
+
+    pub fn result_down(&self) {
+        if self.result_selection_last_changed.lock().elapsed() < DEBOUNCE {
+            return;
+        }
+
+        let results_count = self.results.lock().len() as u8;
+        if results_count == 0 {
+            return;
+        }
+
+        let new_value = (self.result_selected.load(Ordering::SeqCst) + 1) % results_count;
+        self.result_selected.store(new_value, Ordering::SeqCst);
+        *self.result_selection_last_changed.lock() = Instant::now();
+    }
+
+    pub fn get_result_selected(&self) -> usize {
+        self.result_selected.load(Ordering::SeqCst) as usize
+    }
+
+    pub fn set_pane_selected(&self, pane: u8) {
+        self.pane_selected.store(pane, Ordering::SeqCst);
+        *self.pane_last_changed.lock() = Instant::now();
     }
 }

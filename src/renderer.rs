@@ -81,11 +81,35 @@ pub fn renderer(
     stop: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn Error>> {
     let mut vertical_scroll = 0;
+    let mut visible_height = 0;
 
     loop {
         if stop.load(Ordering::SeqCst) {
             break;
         }
+
+        let focus_state = focus.read().to_owned();
+        if let Focus::Main = focus_state {
+            if static_menu_selection.pane_selected.load(Ordering::SeqCst) == 2 {
+                let selected_index = static_menu_selection.get_result_selected();
+                let results_count = static_menu_selection.results.lock().len();
+
+                if visible_height > 0 {
+                    let buffer = (visible_height / 4).max(1);
+
+                    if selected_index >= vertical_scroll + visible_height - buffer {
+                        vertical_scroll = (selected_index + buffer)
+                            .saturating_sub(visible_height)
+                            .min(results_count.saturating_sub(visible_height));
+                    } else if selected_index < vertical_scroll + buffer {
+                        vertical_scroll = selected_index.saturating_sub(buffer);
+                    }
+                } else {
+                    vertical_scroll = selected_index;
+                }
+            }
+        }
+
         terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -155,23 +179,11 @@ pub fn renderer(
             let bottom_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .margin(1)
-                .constraints(
-                    [
-                        Constraint::Percentage(20), // Selection & Search Terms
-                        Constraint::Percentage(80), // Results
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
                 .split(chunks[1]);
             let left_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(
-                    [
-                        Constraint::Percentage(25), // Selection
-                        Constraint::Percentage(75), // Search Terms
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
                 .split(bottom_chunks[0]);
 
             let pane_selected = static_menu_selection.pane_selected.load(Ordering::SeqCst);
@@ -216,6 +228,13 @@ pub fn renderer(
 
             let results = static_menu_selection.generate_results();
             let right_text = Text::from(results.clone());
+
+            let results_area = bottom_chunks[1].inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            });
+            visible_height = results_area.height as usize;
+
             let right_paragraph = Paragraph::new(right_text.clone())
                 .scroll((vertical_scroll as u16, 0))
                 .block(
